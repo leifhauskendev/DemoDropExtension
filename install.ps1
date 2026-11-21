@@ -1,4 +1,5 @@
-# Registers the DemoDrop helper with Chrome (current user only, no admin needed).
+# Registers the DemoDrop helper with Opera GX / Chrome (current user only, no admin needed).
+# Opera reads native messaging hosts from Chrome's registry location, so one key covers both.
 # Run again any time you move this folder or reinstall Node.
 
 $ErrorActionPreference = 'Stop'
@@ -35,5 +36,5 @@ Set-ItemProperty -Path $regKey -Name '(Default)' -Value $manifest
 
 Write-Host ''
 Write-Host 'DemoDrop helper installed.' -ForegroundColor Green
-Write-Host 'Next: in Chrome open chrome://extensions, turn on Developer mode,'
+Write-Host 'Next: open opera://extensions (Opera GX) or chrome://extensions (Chrome), turn on Developer mode,'
 Write-Host "click 'Load unpacked' and choose: $(Join-Path $PSScriptRoot 'extension')"
