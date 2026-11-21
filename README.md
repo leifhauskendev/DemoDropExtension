@@ -21,7 +21,7 @@ Browser extensions can only save inside Downloads and can't unpack archives, so 
 
 | Site | What you do | What arrives |
 |---|---|---|
-| HLTV | Click **Send demo to CS2** (added next to "Demo download") or HLTV's own button | `.rar` with one `.dem` per map, named `<event>-<team1>-vs-<team2>-bo3_<team1>-vs-<team2>-m1-<map>.dem` |
+| HLTV | Click **Send demo to CS2** (added next to "Demo download") or HLTV's own button | `.rar` with one `.dem` per map, named `<tournament>-<team1>-vs-<team2>-m1-<map>.dem` (HLTV's demo name with the tournament in front) |
 | FACEIT | Click FACEIT's **Watch demo** in the match room (must be logged in) | `.dem.zst`, renamed to `faceit_<team1>_vs_<team2>_<map>_<id>.dem` |
 
 ## Setup (Windows)

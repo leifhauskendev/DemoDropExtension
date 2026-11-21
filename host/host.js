@@ -142,12 +142,12 @@ async function extractRar(file, dest) {
   try {
     const extractor = await createExtractorFromFile({ filepath: file, targetPath: tmp });
     const { files } = extractor.extract({ files: h => !h.flags.directory && h.name.toLowerCase().endsWith('.dem') });
-    const prefix = hltvMatchName(file);
     const names = [];
     for (const f of files) {
       const src = path.join(tmp, f.fileHeader.name);
       const inner = path.basename(f.fileHeader.name);
-      const name = prefix ? `${prefix}_${inner}` : inner;
+      const event = hltvEventName(file, inner);
+      const name = event ? `${event}-${inner}` : inner;
       const target = uniquePath(path.join(dest, name));
       await moveFile(src, target);
       names.push(path.basename(target));
@@ -159,12 +159,14 @@ async function extractRar(file, dest) {
 }
 
 // HLTV archives are named <event>-<team1>-vs-<team2>-bo3-<random id>.rar, while
-// the demos inside are only <team1>-vs-<team2>-m1-<map>.dem. Keep the event part
-// by prefixing each demo with the archive name, minus the random id.
-function hltvMatchName(file) {
-  const base = path.basename(file, path.extname(file)).replace(/ \(\d+\)$/, ''); // drop browser "(1)" suffix
-  const m = base.match(/^(.*-bo\d+)(?:-[A-Za-z0-9_-]+)?$/i);
-  return m ? m[1] : base;
+// the demos inside are only <team1>-vs-<team2>-m1-<map>.dem. Return the <event>
+// part: everything in the archive name before the demo's team names.
+function hltvEventName(archive, demoName) {
+  const teams = demoName.match(/^(.*)-m\d+-[^-]+\.dem$/i)?.[1];
+  if (!teams) return null;
+  const base = path.basename(archive, path.extname(archive));
+  const at = base.indexOf(`-${teams}-bo`);
+  return at > 0 ? base.slice(0, at) : null;
 }
 
 // Same approach as DemoDrop's move-file handler: rename, with a copy+delete
