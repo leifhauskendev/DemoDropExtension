@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "DemoDrop",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Downloads CS2 demos from HLTV and FACEIT match pages and drops them straight into your CS2 folder.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAo66wuX7mMylv1/h5eifypBsbg91G3TEx7x4zwlwoHohE1e+eiEm/PpnjD2wBwxn9DIFEMGHMK51jeXUz+1lTjQ6Vn2fa4iwzmIeQyqaySOAQUnvbQ08qQN2DzwEN+ugHJ8h2A6esFKD0UoIcmLXG7TpblcvYS/oNguOfmJDtdFvt0yj5JGsjBomJADtitDi7DGYNB0L6MTWL0YLSqtTFBTh0aBISxOQllEzl4Egl4CTQjMqLCQC7N4/R7WHSMrsewE+ZE/UJdrNHXZZUGlmmQQCjrk7ZC8RG0Jztqh7BmqWdCs674u/s1FBaWXk2tbu0oEG2ODwduhBkcgS58uctQQIDAQAB",
   "permissions": ["downloads", "nativeMessaging", "notifications", "storage"],
