@@ -168,13 +168,29 @@ async function uploadFile({ file, url, headers }) {
   // The upload link comes from Refrag's API (a signed storage URL).
   if (new URL(url).protocol !== 'https:') throw new Error('Refrag gave a non-secure upload link');
   const size = fs.statSync(file).size;
-  const res = await fetch(url, {
-    method: 'PUT',
-    headers: { ...headers, 'Content-Length': String(size) },
-    body: fs.createReadStream(file),
-    duplex: 'half'
-  });
-  if (!res.ok) throw new Error(`Refrag upload failed (HTTP ${res.status})`);
+  // Big uploads occasionally lose the connection: try a few times.
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const res = await fetch(url, {
+        method: 'PUT',
+        headers: { ...headers, 'Content-Length': String(size) },
+        body: fs.createReadStream(file),
+        duplex: 'half'
+      });
+      if (res.ok) return;
+      const body = (await res.text()).slice(0, 300);
+      log(`upload attempt ${attempt}: HTTP ${res.status}`, body);
+      if (res.status < 500 || attempt === 3) throw new Error(`Refrag upload failed (HTTP ${res.status})`);
+    } catch (err) {
+      // fetch hides the real network error in err.cause
+      const reason = err.cause?.code || err.cause?.message || err.message;
+      log(`upload attempt ${attempt} failed:`, reason);
+      if (err.message.startsWith('Refrag upload failed') || attempt === 3) {
+        throw new Error(err.message.startsWith('Refrag upload failed') ? err.message : `Upload to Refrag failed: ${reason}`);
+      }
+    }
+    await new Promise(r => setTimeout(r, attempt * 3000));
+  }
 }
 
 async function extractRar(file, dest, dateSuffix) {
