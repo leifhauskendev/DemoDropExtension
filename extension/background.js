@@ -28,7 +28,10 @@ function demoSource(item) {
     if (host === 'r2-demos.hltv.org' || (host.endsWith('hltv.org') && u.pathname.startsWith('/download/demo/'))) {
       return 'hltv';
     }
-    if (host.endsWith('faceit-cdn.net') && /\.dem(\.zst|\.gz)?$/i.test(u.pathname)) {
+    // Signed FACEIT links look like
+    // https://demos-us-east-faceit-cdn.s3.us-east-005.backblazeb2.com/cs2/1-<match>-1-1.dem.zst?X-Amz-...
+    const faceitHost = host.endsWith('faceit-cdn.net') || (host.includes('faceit') && host.endsWith('backblazeb2.com'));
+    if (faceitHost && /\.dem(\.zst|\.gz)?$/i.test(u.pathname)) {
       return 'faceit';
     }
   }
@@ -95,16 +98,18 @@ chrome.downloads.onChanged.addListener(async delta => {
 // ---------- handing off to the native helper ----------
 
 async function faceitName(filePath) {
-  // FACEIT files look like 1-<match uuid>-1-1.dem.zst
+  // FACEIT files look like 1-<match uuid>-<map number>-<part>.dem.zst
   const base = filePath.split(/[\\/]/).pop();
   const m = base.match(/^(1-[0-9a-f-]{36})-(\d+)-(\d+)\.dem/i);
   if (!m) return null;
-  const [, matchId, , mapNo] = m;
+  const [, matchId, mapNo] = m;
   try {
     const res = await fetch(`https://www.faceit.com/api/match/v2/match/${matchId}`);
     const { payload } = await res.json();
-    const t1 = payload?.teams?.faction1?.name;
-    const t2 = payload?.teams?.faction2?.name;
+    // Matchmaking teams are called team_<captain>; keep just the captain.
+    const team = f => payload?.teams?.[f]?.name?.replace(/^team_/i, '');
+    const t1 = team('faction1');
+    const t2 = team('faction2');
     const picks = payload?.voting?.map?.pick || [];
     const map = picks[Number(mapNo) - 1] || picks[0] || '';
     const parts = ['faceit', t1, 'vs', t2, map, matchId.slice(2, 10)].filter(Boolean);
@@ -115,7 +120,7 @@ async function faceitName(filePath) {
 }
 
 function sanitize(s) {
-  return s.replace(/^team_/i, '').replace(/[^a-z0-9_\-.]+/gi, '-').replace(/-+/g, '-');
+  return s.replace(/[^a-z0-9_\-.]+/gi, '-').replace(/-+/g, '-');
 }
 
 function sendToHost(message) {
