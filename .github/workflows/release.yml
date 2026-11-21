@@ -1,0 +1,49 @@
+name: Release
+
+# Push a tag like v0.2.0 to build DemoDrop.zip and publish a GitHub release.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Check versions match the tag
+        shell: pwsh
+        run: |
+          $tag = '${{ github.ref_name }}'.TrimStart('v')
+          $ext = (Get-Content extension/manifest.json | ConvertFrom-Json).version
+          $hostVer = (Get-Content host/package.json | ConvertFrom-Json).version
+          if ($ext -ne $tag -or $hostVer -ne $tag) {
+            throw "Tag $tag does not match extension ($ext) / host ($hostVer) versions"
+          }
+
+      - name: Install helper dependencies
+        working-directory: host
+        run: npm ci --omit=dev
+
+      - name: Build DemoDrop.zip
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory dist/DemoDrop | Out-Null
+          Copy-Item extension, host, Install.cmd, setup.ps1, install.ps1, uninstall.ps1, README.md, LICENSE dist/DemoDrop -Recurse
+          Compress-Archive -Path dist/DemoDrop/* -DestinationPath dist/DemoDrop.zip
+          Copy-Item get-demodrop.ps1 dist/
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          gh release create '${{ github.ref_name }}' dist/DemoDrop.zip dist/get-demodrop.ps1 `
+            --title "DemoDrop ${{ github.ref_name }}" --generate-notes
