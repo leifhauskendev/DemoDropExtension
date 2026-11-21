@@ -104,7 +104,7 @@ function findCs2DemoDir() {
 
 // ---------- unpacking and moving ----------
 
-async function processDemo({ file, targetDir, outputName, deleteArchive }) {
+async function processDemo({ file, targetDir, outputName, dateSuffix, deleteArchive }) {
   if (!file || !fs.existsSync(file)) throw new Error(`Downloaded file not found: ${file}`);
 
   const dest = targetDir || findCs2DemoDir();
@@ -115,7 +115,7 @@ async function processDemo({ file, targetDir, outputName, deleteArchive }) {
   let results;
 
   if (lower.endsWith('.rar')) {
-    results = await extractRar(file, dest);
+    results = await extractRar(file, dest, dateSuffix);
   } else if (lower.endsWith('.dem.zst') || lower.endsWith('.dem.gz')) {
     const name = outputName || path.basename(file).replace(/\.(zst|gz)$/i, '');
     const target = uniquePath(path.join(dest, name));
@@ -135,7 +135,7 @@ async function processDemo({ file, targetDir, outputName, deleteArchive }) {
   return results;
 }
 
-async function extractRar(file, dest) {
+async function extractRar(file, dest, dateSuffix) {
   // Unpack into a temp folder first so existing demos with the same name are
   // never overwritten, then move each .dem across with a unique name.
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'demodrop-'));
@@ -147,7 +147,8 @@ async function extractRar(file, dest) {
       const src = path.join(tmp, f.fileHeader.name);
       const inner = path.basename(f.fileHeader.name);
       const event = hltvEventName(file, inner);
-      const name = event ? `${event}-${inner}` : inner;
+      let name = event ? `${event}-${inner}` : inner;
+      if (dateSuffix) name = name.replace(/\.dem$/i, `-${dateSuffix}.dem`);
       const target = uniquePath(path.join(dest, name));
       await moveFile(src, target);
       names.push(path.basename(target));

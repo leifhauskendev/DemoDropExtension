@@ -69,7 +69,8 @@ chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
       return;
     }
     const name = item.filename.split(/[\\/]/).pop();
-    await trackDownload(item.id, { source, url: item.finalUrl || item.url });
+    const { hltvDates = {} } = await chrome.storage.session.get('hltvDates');
+    await trackDownload(item.id, { source, url: item.finalUrl || item.url, date: hltvDates[item.url] || null });
     setBadge('…');
     suggest({ filename: `${DOWNLOAD_SUBDIR}/${name}`, conflictAction: 'uniquify' });
   });
@@ -112,11 +113,21 @@ async function faceitName(filePath) {
     const t2 = team('faction2');
     const picks = payload?.voting?.map?.pick || [];
     const map = picks[Number(mapNo) - 1] || picks[0] || '';
-    const parts = ['faceit', t1, 'vs', t2, map, matchId.slice(2, 10)].filter(Boolean);
+    const date = formatDate(payload?.startedAt || payload?.finishedAt);
+    const parts = ['faceit', t1, 'vs', t2, map, matchId.slice(2, 10), date].filter(Boolean);
     return sanitize(parts.join('_')) + '.dem';
   } catch {
     return null; // keep FACEIT's own name if the lookup fails
   }
+}
+
+// YYYY-MM-DD in local time, from a timestamp (ms) or ISO string.
+function formatDate(value) {
+  if (!value) return null;
+  const d = new Date(value);
+  if (isNaN(d)) return null;
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 function sanitize(s) {
@@ -160,6 +171,7 @@ async function processDownload(filePath, info) {
     type: 'process',
     file: filePath,
     outputName,
+    dateSuffix: info.source === 'hltv' ? formatDate(info.date) : null,
     targetDir: settings.targetDir || null,
     deleteArchive: settings.deleteArchive
   });
@@ -183,6 +195,13 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       sendResponse({ ok: id !== undefined, error: chrome.runtime.lastError?.message });
     });
     return true;
+  }
+  if (msg.type === 'hltv-match') {
+    chrome.storage.session.get('hltvDates').then(({ hltvDates = {} }) => {
+      hltvDates[msg.url] = msg.date;
+      chrome.storage.session.set({ hltvDates });
+    });
+    return;
   }
   if (msg.type === 'ping-host') {
     sendToHost({ type: 'ping' }).then(sendResponse);

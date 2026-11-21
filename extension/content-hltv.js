@@ -7,6 +7,11 @@
   const path = demoEl.getAttribute('data-demo-link') || demoEl.getAttribute('href');
   const url = new URL(path, location.origin).href;
 
+  // The archive name has no date, so tell the background worker the match date
+  // for this demo link (used whichever download button is clicked).
+  const unix = Number(document.querySelector('.timeAndEvent .date[data-unix]')?.dataset.unix);
+  if (unix) chrome.runtime.sendMessage({ type: 'hltv-match', url, date: unix });
+
   const btn = document.createElement('button');
   btn.className = 'demodrop-btn';
   btn.textContent = '⬇ Send demo to CS2';
