@@ -1,5 +1,5 @@
 # Registers the DemoDrop helper with Opera GX / Chrome (current user only, no admin needed).
-# Opera reads native messaging hosts from Chrome's registry location, so one key covers both.
+# Each browser reads its own registry location, so we register for Opera GX, Opera and Chrome.
 # Run again any time you move this folder or reinstall Node.
 
 $ErrorActionPreference = 'Stop'
@@ -30,9 +30,11 @@ $json = @{
 # Write without a byte-order mark, which Chrome's manifest reader rejects.
 [IO.File]::WriteAllText($manifest, $json, (New-Object Text.UTF8Encoding $false))
 
-$regKey = "HKCU:\Software\Google\Chrome\NativeMessagingHosts\$HostName"
-New-Item -Path $regKey -Force | Out-Null
-Set-ItemProperty -Path $regKey -Name '(Default)' -Value $manifest
+foreach ($browserKey in 'Opera Software\Opera GX Stable', 'Opera Software\Opera Stable', 'Google\Chrome') {
+  $regKey = "HKCU:\Software\$browserKey\NativeMessagingHosts\$HostName"
+  New-Item -Path $regKey -Force | Out-Null
+  Set-ItemProperty -Path $regKey -Name '(Default)' -Value $manifest
+}
 
 Write-Host ''
 Write-Host 'DemoDrop helper installed.' -ForegroundColor Green
