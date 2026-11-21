@@ -2,58 +2,85 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>DemoDrop settings</title>
-  <style>
-    body { font: 14px/1.5 system-ui, sans-serif; max-width: 640px; margin: 32px auto; padding: 0 16px; color: #0f172a; }
-    h1 { font-size: 22px; margin-bottom: 4px; }
-    .sub { color: #64748b; margin-top: 0; }
-    label { display: block; margin: 18px 0 6px; font-weight: 600; }
-    input[type=text] { width: 100%; box-sizing: border-box; padding: 8px; font: inherit; }
-    .check { display: flex; gap: 8px; align-items: flex-start; font-weight: 400; }
-    .hint { color: #64748b; font-size: 12px; margin-top: 4px; }
-    button { margin-top: 20px; padding: 8px 16px; font: inherit; cursor: pointer; }
-    #status { margin-top: 24px; padding: 10px 12px; border-radius: 6px; background: #f1f5f9; }
-    #status.ok { background: #dcfce7; }
-    #status.bad { background: #fee2e2; }
-    h2 { font-size: 17px; margin: 32px 0 4px; padding-top: 20px; border-top: 1px solid #e2e8f0; }
-    select { width: 100%; padding: 8px; font: inherit; }
-    .refrag { margin-top: 12px; padding: 10px 12px; border-radius: 6px; background: #f1f5f9; }
-    .refrag.ok { background: #dcfce7; }
-    .row button { margin-top: 10px; }
-  </style>
+  <link rel="icon" href="icons/icon32.png">
+  <link rel="stylesheet" href="options.css">
 </head>
 <body>
-  <h1>DemoDrop</h1>
-  <p class="sub">Sends HLTV and FACEIT demos straight into your CS2 folder.</p>
+  <main>
+    <header class="top">
+      <img src="icons/logo.svg" alt="" width="48" height="48">
+      <div>
+        <h1>DemoDrop</h1>
+        <p>HLTV and FACEIT demos, straight into CS2.</p>
+      </div>
+      <span class="version" id="version"></span>
+    </header>
 
-  <div id="status">Checking the DemoDrop helper…</div>
+    <section class="card">
+      <div class="status" id="status" data-state="wait">
+        <span class="dot"></span>
+        <span id="statusText">Checking the DemoDrop helper…</span>
+      </div>
+    </section>
 
-  <label for="targetDir">CS2 demo folder</label>
-  <input type="text" id="targetDir" placeholder="Auto-detected">
-  <div class="hint">Leave empty to use the folder the helper finds automatically (shown above).</div>
+    <section class="card">
+      <h2>Demos</h2>
 
-  <label class="check"><input type="checkbox" id="deleteArchive"> Delete the downloaded archive after unpacking</label>
-  <label class="check"><input type="checkbox" id="catchSiteDownloads"> Also handle demos downloaded with HLTV's / FACEIT's own buttons</label>
-  <div class="hint">Needed for FACEIT, where the site's "Watch demo" button is the only way to get the file.</div>
+      <label class="field">
+        <span class="label">CS2 demo folder</span>
+        <input type="text" id="targetDir" placeholder="Auto-detected" spellcheck="false">
+        <span class="hint">Leave empty to use the folder found automatically.</span>
+      </label>
 
-  <h2>Refrag</h2>
-  <p class="hint">Import FACEIT demos into Refrag's 2D demo viewer. Needs a Refrag plan with the demo viewer (Prime or Team).</p>
+      <label class="toggle">
+        <span>
+          <span class="label">Delete the download after unpacking</span>
+          <span class="hint">Keeps your Downloads folder tidy.</span>
+        </span>
+        <input type="checkbox" id="deleteArchive">
+      </label>
 
-  <div id="refragStatus" class="refrag">Checking Refrag…</div>
-  <div class="row">
-    <button id="refragSignIn" hidden>Sign in to Refrag</button>
-    <button id="refragSignOut" hidden>Disconnect Refrag</button>
-  </div>
-  <div class="hint">DemoDrop uses your login from the Refrag website: sign in on play.refrag.gg and DemoDrop picks it up. Your password never goes through DemoDrop.</div>
+      <label class="toggle">
+        <span>
+          <span class="label">Catch the sites' own download buttons</span>
+          <span class="hint">Needed for FACEIT, where "Watch demo" is the only way to get the file.</span>
+        </span>
+        <input type="checkbox" id="catchSiteDownloads">
+      </label>
+    </section>
 
-  <label for="refragImport">Import FACEIT demos into Refrag</label>
-  <select id="refragImport">
-    <option value="off">Off</option>
-    <option value="ask">Ask me each time (button in the "demos ready" pop-up)</option>
-    <option value="always">Always, automatically</option>
-  </select>
+    <section class="card">
+      <h2>Refrag</h2>
+      <p class="hint">Send FACEIT demos to Refrag's 2D demo viewer. Needs a Refrag plan with the demo viewer (Prime or Team).</p>
 
-  <button id="save">Save</button> <span id="saved"></span>
+      <div class="account">
+        <div class="status" id="refragStatus" data-state="wait">
+          <span class="dot"></span>
+          <span id="refragText">Checking Refrag…</span>
+        </div>
+        <button class="btn primary" id="refragSignIn" hidden>Sign in to Refrag</button>
+        <button class="btn ghost" id="refragSignOut" hidden>Disconnect</button>
+      </div>
+      <p class="hint">You sign in on Refrag's own site and DemoDrop uses that login. Your password never goes through DemoDrop.</p>
+
+      <div class="field">
+        <span class="label" id="refragImportLabel">Import FACEIT demos</span>
+        <div class="segmented" role="radiogroup" aria-labelledby="refragImportLabel">
+          <label><input type="radio" name="refragImport" value="off"><span>Off</span></label>
+          <label><input type="radio" name="refragImport" value="ask"><span>Ask each time</span></label>
+          <label><input type="radio" name="refragImport" value="always"><span>Always</span></label>
+        </div>
+        <span class="hint" id="refragImportHint"></span>
+      </div>
+    </section>
+
+    <footer>
+      <span>Changes save automatically.</span>
+      <span class="saved" id="saved">Saved</span>
+    </footer>
+  </main>
 
   <script src="options.js"></script>
 </body>

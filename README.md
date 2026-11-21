@@ -1,10 +1,12 @@
+<p align="center"><img src="extension/icons/logo.svg" alt="DemoDrop logo" width="96" height="96"></p>
+
 # DemoDrop
 
 **One click on an HLTV or FACEIT match page, and the demos land in your CS2 folder, unpacked and ready for `playdemo`.**
 
 Works in Opera GX, Opera, Chrome, Edge and Brave on Windows.
 
-[![Download DemoDrop](https://img.shields.io/badge/Download-DemoDrop.zip-2563eb?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/leifhauskendev/DemoDropExtension/releases/latest/download/DemoDrop.zip)
+[![Download DemoDrop](https://img.shields.io/badge/Download-DemoDrop.zip-8a91ee?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/leifhauskendev/DemoDropExtension/releases/latest/download/DemoDrop.zip)
 
 ---
 

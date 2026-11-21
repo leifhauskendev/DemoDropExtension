@@ -12,17 +12,24 @@
   const unix = Number(document.querySelector('.timeAndEvent .date[data-unix]')?.dataset.unix);
   if (unix) chrome.runtime.sendMessage({ type: 'hltv-match', url, date: unix });
 
+  // The logo's crosshair + download arrow, drawn in white for the button.
+  const ICON = '<svg viewBox="0 0 128 128" aria-hidden="true" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">' +
+    '<circle cx="64" cy="64" r="42" stroke-opacity=".6" stroke-width="9"/>' +
+    '<path d="M64 8 V26 M64 102 V120 M8 64 H26 M102 64 H120" stroke-width="10"/>' +
+    '<path d="M64 40 V74 M50 61 L64 75 L78 61 M46 86 H82" stroke-width="12"/></svg>';
+
   const btn = document.createElement('button');
   btn.className = 'demodrop-btn';
-  btn.textContent = '⬇ Send demo to CS2';
+  const setLabel = text => { btn.innerHTML = ICON; btn.append(text); };
+  setLabel('Send demo to CS2');
   btn.addEventListener('click', async () => {
     btn.disabled = true;
-    btn.textContent = 'Downloading… (see Chrome downloads)';
+    setLabel('Downloading…');
     const res = await chrome.runtime.sendMessage({ type: 'download', url });
     if (!res?.ok) {
       btn.disabled = false;
-      btn.textContent = '⬇ Send demo to CS2';
-      alert('DemoDrop: download could not start. ' + (res?.error || ''));
+      setLabel('Couldn\'t start the download. Try again');
+      btn.title = res?.error || '';
     }
   });
 
