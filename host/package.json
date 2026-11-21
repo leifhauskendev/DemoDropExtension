@@ -1,0 +1,14 @@
+{
+  "name": "demodrop-host",
+  "version": "0.1.0",
+  "description": "Native messaging helper for the DemoDrop extension: unpacks CS2 demos into the game folder",
+  "main": "host.js",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "node": ">=23.8"
+  },
+  "dependencies": {
+    "node-unrar-js": "^2.0.2"
+  }
+}

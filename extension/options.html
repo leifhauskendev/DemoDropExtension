@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>DemoDrop settings</title>
+  <style>
+    body { font: 14px/1.5 system-ui, sans-serif; max-width: 640px; margin: 32px auto; padding: 0 16px; color: #0f172a; }
+    h1 { font-size: 22px; margin-bottom: 4px; }
+    .sub { color: #64748b; margin-top: 0; }
+    label { display: block; margin: 18px 0 6px; font-weight: 600; }
+    input[type=text] { width: 100%; box-sizing: border-box; padding: 8px; font: inherit; }
+    .check { display: flex; gap: 8px; align-items: flex-start; font-weight: 400; }
+    .hint { color: #64748b; font-size: 12px; margin-top: 4px; }
+    button { margin-top: 20px; padding: 8px 16px; font: inherit; cursor: pointer; }
+    #status { margin-top: 24px; padding: 10px 12px; border-radius: 6px; background: #f1f5f9; }
+    #status.ok { background: #dcfce7; }
+    #status.bad { background: #fee2e2; }
+  </style>
+</head>
+<body>
+  <h1>DemoDrop</h1>
+  <p class="sub">Sends HLTV and FACEIT demos straight into your CS2 folder.</p>
+
+  <div id="status">Checking the DemoDrop helper…</div>
+
+  <label for="targetDir">CS2 demo folder</label>
+  <input type="text" id="targetDir" placeholder="Auto-detected">
+  <div class="hint">Leave empty to use the folder the helper finds automatically (shown above).</div>
+
+  <label class="check"><input type="checkbox" id="deleteArchive"> Delete the downloaded archive after unpacking</label>
+  <label class="check"><input type="checkbox" id="catchSiteDownloads"> Also handle demos downloaded with HLTV's / FACEIT's own buttons</label>
+  <div class="hint">Needed for FACEIT, where the site's "Watch demo" button is the only way to get the file.</div>
+
+  <button id="save">Save</button> <span id="saved"></span>
+
+  <script src="options.js"></script>
+</body>
+</html>
