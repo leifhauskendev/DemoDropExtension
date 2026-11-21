@@ -57,6 +57,20 @@ playdemo blast-rivals-2026-season-2-g2-vs-falcons-m1-dust2-2026-11-13
 
 Downloads go through your browser (so logins and site protections just work) into `Downloads\DemoDrop`, then the helper unpacks them into CS2 and deletes the archive.
 
+## Import FACEIT demos into Refrag
+
+Want to scout a team in [Refrag](https://refrag.gg)'s 2D demo viewer? DemoDrop can upload FACEIT demos to your Refrag account for you. (HLTV demos are already on Refrag, so this is FACEIT only.) You need a Refrag plan with the demo viewer (Prime or Team).
+
+1. Open DemoDrop's settings and click **Sign in to Refrag**, then log in on Refrag's site as usual. DemoDrop uses that login; your password never goes through DemoDrop.
+2. Set **Import FACEIT demos into Refrag** to:
+   - **Ask me each time**: the "demos ready" pop-up gets an **Import to Refrag** button (or click the pop-up).
+   - **Always, automatically**: every FACEIT demo is uploaded right away.
+3. When the upload is done, click the pop-up to open the match in Refrag.
+
+If your Refrag login has expired, DemoDrop asks you to sign in again and then finishes the import by itself. Demos already on Refrag aren't uploaded twice.
+
+Note: FACEIT matchmaking demos don't contain team names, so Refrag shows the teams as **team1** and **team2** (team1 is FACEIT's first-listed team). Refrag doesn't allow renaming uploaded demos, so DemoDrop can't change that.
+
 ## Settings
 
 Click the DemoDrop icon:
@@ -64,6 +78,7 @@ Click the DemoDrop icon:
 - **CS2 demo folder**: leave empty to use the auto-detected `...\Counter-Strike Global Offensive\game\csgo`.
 - **Delete the downloaded archive after unpacking**: on by default.
 - **Also handle the sites' own download buttons**: on by default; needed for FACEIT.
+- **Refrag**: sign-in status and the import setting described above.
 
 ## Update
 

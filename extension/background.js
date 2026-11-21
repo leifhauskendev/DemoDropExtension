@@ -9,8 +9,12 @@ const DOWNLOAD_SUBDIR = 'DemoDrop';
 const DEFAULT_SETTINGS = {
   targetDir: '',          // empty = let the helper find CS2's game\csgo folder
   deleteArchive: true,    // remove the downloaded archive after unpacking
-  catchSiteDownloads: true // also handle demos started with the site's own buttons
+  catchSiteDownloads: true, // also handle demos started with the site's own buttons
+  refragImport: 'off'     // FACEIT demos: 'off' | 'ask' (pop-up button) | 'always'
 };
+
+const REFRAG_API = 'https://api-k8s.refrag.gg/';
+const REFRAG_APP = 'https://play.refrag.gg/';
 
 async function getSettings() {
   const stored = await chrome.storage.sync.get(DEFAULT_SETTINGS);
@@ -98,6 +102,7 @@ chrome.downloads.onChanged.addListener(async delta => {
 
 // ---------- handing off to the native helper ----------
 
+// Builds a readable file name for a FACEIT demo from its match details.
 async function faceitName(filePath) {
   // FACEIT files look like 1-<match uuid>-<map number>-<part>.dem.zst
   const base = filePath.split(/[\\/]/).pop();
@@ -177,18 +182,167 @@ async function processDownload(filePath, info) {
   });
 
   setBadge('');
-  if (reply.ok) {
-    const list = reply.files.join(', ');
-    notify(`${reply.files.length} demo${reply.files.length === 1 ? '' : 's'} ready`,
-      `${list}\nIn CS2 console: playdemo ${reply.files[0].replace(/\.dem$/, '')}`);
-  } else {
+  if (!reply.ok) {
     notify('DemoDrop could not finish', `${reply.error}\nThe download is still in Downloads\\${DOWNLOAD_SUBDIR}.`);
+    return;
+  }
+
+  const title = `${reply.files.length} demo${reply.files.length === 1 ? '' : 's'} ready`;
+  const message = `${reply.files.join(', ')}\nIn CS2 console: playdemo ${reply.files[0].replace(/\.dem$/, '')}`;
+  const items = reply.files.map(f => ({ file: `${reply.dir}\\${f}` }));
+
+  if (info.source === 'faceit' && settings.refragImport === 'always') {
+    notify(title, message);
+    await importToRefrag(items);
+  } else if (info.source === 'faceit' && settings.refragImport === 'ask') {
+    const id = await notify(title, `${message}\nClick to import into Refrag.`, {
+      buttons: [{ title: 'Import to Refrag' }],
+      requireInteraction: true
+    });
+    const { refragOffers = {} } = await chrome.storage.session.get('refragOffers');
+    refragOffers[id] = items;
+    await chrome.storage.session.set({ refragOffers });
+  } else {
+    notify(title, message);
   }
 }
 
+// ---------- Refrag import ----------
+// Refrag's own "Upload demo" dialog does: POST demos.json with the file's
+// SHA-256 -> PUT the file to the returned upload link -> POST demos/<id>/analyze.
+// We do the same, with the login Refrag keeps in the browser (see
+// content-refrag.js). The helper hashes and uploads, since it can read the file.
+
+async function getRefragSession() {
+  const { refragSession } = await chrome.storage.local.get('refragSession');
+  return refragSession || null;
+}
+
+function refragHeaders(session) {
+  // Stored as "token-type|access-token|client|uid|expiry".
+  const names = ['Token-Type', 'Access-Token', 'Client', 'Uid', 'Expiry'];
+  const parts = session.token.split('|');
+  const headers = {};
+  names.forEach((n, i) => { if (parts[i]) headers[n] = parts[i]; });
+  if (session.teamId) headers['X-TEAM-ID'] = session.teamId;
+  return headers;
+}
+
+async function refragFetch(session, path, options = {}) {
+  const res = await fetch(REFRAG_API + path, {
+    ...options,
+    headers: { ...refragHeaders(session), ...(options.headers || {}) }
+  });
+  if (res.status === 401) {
+    await chrome.storage.local.remove('refragSession');
+    throw Object.assign(new Error('Your Refrag login has expired.'), { signIn: true });
+  }
+  if (!res.ok) throw new Error(`Refrag answered HTTP ${res.status}`);
+  return res.json();
+}
+
+async function refragUser() {
+  const session = await getRefragSession();
+  if (!session) return null;
+  try {
+    const { data: u } = await refragFetch(session, 'auth/validate_token');
+    return { name: u.username || u.nickname || u.name || u.faceit_nickname || 'your Refrag account' };
+  } catch {
+    return null;
+  }
+}
+
+// Imports waiting for a Refrag sign-in run as soon as the user signs in.
+async function deferImport(items) {
+  const { refragPending = [] } = await chrome.storage.local.get('refragPending');
+  const files = new Set(refragPending.map(p => p.file));
+  await chrome.storage.local.set({ refragPending: [...refragPending, ...items.filter(p => !files.has(p.file))] });
+}
+
+async function resumePendingImport() {
+  const { refragPending = [] } = await chrome.storage.local.get('refragPending');
+  if (!refragPending.length) return;
+  await chrome.storage.local.remove('refragPending');
+  await importToRefrag(refragPending);
+}
+
+async function importToRefrag(items) {
+  const session = await getRefragSession();
+  if (!session) {
+    await deferImport(items);
+    offerRefragSignIn('Sign in to Refrag and the import will start by itself.');
+    return;
+  }
+  for (const [i, { file }] of items.entries()) {
+    const name = file.split('\\').pop();
+    try {
+      setBadge('↑');
+      const hash = await sendToHost({ type: 'hash', file });
+      if (!hash.ok) throw new Error(hash.error);
+
+      const form = new FormData();
+      form.append('demo[game]', 'cs2');
+      form.append('demo[file_hash]', hash.sha256);
+      const demo = await refragFetch(session, 'demos.json', { method: 'POST', body: form });
+
+      if (demo.status !== 'ready') {
+        notify('Uploading to Refrag…', `${name} (${Math.round(hash.size / 1048576)} MB)`);
+        const up = await sendToHost({
+          type: 'upload',
+          file,
+          url: demo.demo_upload_url,
+          headers: session.teamId ? { 'X-TEAM-ID': session.teamId } : {}
+        });
+        if (!up.ok) throw new Error(up.error);
+      }
+
+      const analysis = demo.status === 'ready' ? {} : await refragFetch(session, `demos/${demo.id}/analyze`, { method: 'POST' });
+      const link = analysis.match_id ? `${REFRAG_APP}matches/${analysis.match_id}` : `${REFRAG_APP}demos/${demo.id}`;
+      const id = await notify(demo.status === 'ready' ? 'Already on Refrag' : 'Imported to Refrag',
+        `${name}\nClick to open it in Refrag${demo.status === 'ready' ? '' : ' (processing can take a few minutes)'}.`);
+      const { refragLinks = {} } = await chrome.storage.session.get('refragLinks');
+      refragLinks[id] = link;
+      await chrome.storage.session.set({ refragLinks });
+    } catch (err) {
+      if (err.signIn) {
+        await deferImport(items.slice(i));
+        offerRefragSignIn(`${err.message} Sign in again and the import will continue by itself.`);
+        return;
+      }
+      notify('Refrag import failed', `${name}\n${err.message}`);
+    } finally {
+      setBadge('');
+    }
+  }
+}
+
+async function offerRefragSignIn(message) {
+  const id = await notify('Refrag: sign in needed', `${message}\nClick to open Refrag.`);
+  const { refragLinks = {} } = await chrome.storage.session.get('refragLinks');
+  refragLinks[id] = `${REFRAG_APP}login`;
+  await chrome.storage.session.set({ refragLinks });
+}
+
+async function handleNotificationClick(id) {
+  const { refragOffers = {}, refragLinks = {} } = await chrome.storage.session.get(['refragOffers', 'refragLinks']);
+  if (refragOffers[id]) {
+    const items = refragOffers[id];
+    delete refragOffers[id];
+    await chrome.storage.session.set({ refragOffers });
+    chrome.notifications.clear(id);
+    await importToRefrag(items);
+  } else if (refragLinks[id]) {
+    chrome.tabs.create({ url: refragLinks[id] });
+    chrome.notifications.clear(id);
+  }
+}
+
+chrome.notifications.onClicked.addListener(handleNotificationClick);
+chrome.notifications.onButtonClicked.addListener(id => handleNotificationClick(id));
+
 // ---------- messages from content scripts / options page ----------
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'download') {
     requestedUrls.add(msg.url);
     chrome.downloads.download({ url: msg.url }, id => {
@@ -207,6 +361,25 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     sendToHost({ type: 'ping' }).then(sendResponse);
     return true;
   }
+  if (msg.type === 'refrag-session') {
+    // From content-refrag.js: null means signed out on Refrag. Only Refrag's
+    // own site may set this.
+    if (!sender.url?.startsWith(REFRAG_APP)) return;
+    if (msg.session) {
+      chrome.storage.local.set({ refragSession: msg.session }).then(resumePendingImport);
+    } else {
+      chrome.storage.local.remove('refragSession');
+    }
+    return;
+  }
+  if (msg.type === 'refrag-user') {
+    refragUser().then(sendResponse);
+    return true;
+  }
+  if (msg.type === 'refrag-sign-out') {
+    chrome.storage.local.remove('refragSession').then(() => sendResponse({ ok: true }));
+    return true;
+  }
 });
 
 chrome.action.onClicked.addListener(() => chrome.runtime.openOptionsPage());
@@ -218,11 +391,12 @@ function setBadge(text) {
   chrome.action.setBadgeBackgroundColor({ color: '#2563eb' });
 }
 
-function notify(title, message) {
-  chrome.notifications.create({
+function notify(title, message, extra = {}) {
+  return chrome.notifications.create({
     type: 'basic',
     iconUrl: 'icons/icon128.png',
     title,
-    message
+    message,
+    ...extra
   });
 }

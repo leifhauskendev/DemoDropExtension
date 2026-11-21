@@ -4,6 +4,7 @@
 // anything else to stdout: debug output goes to the log file instead.
 
 const fs = require('fs');
+const crypto = require('crypto');
 const os = require('os');
 const path = require('path');
 const zlib = require('zlib');
@@ -61,14 +62,22 @@ async function handle(msg) {
 }
 
 async function handleMessage(msg) {
-  log('received', JSON.stringify(msg));
+  // Upload requests carry login headers and a signed link: never log those.
+  log('received', JSON.stringify(msg, (k, v) =>
+    k === 'headers' ? '[redacted]' : k === 'url' && typeof v === 'string' ? v.split('?')[0] : v));
   try {
     if (msg.type === 'ping') {
       send({ ok: true, version: VERSION, defaultDir: findCs2DemoDir() });
     } else if (msg.type === 'process') {
-      const files = await processDemo(msg);
+      const { files, dir } = await processDemo(msg);
       log('done', files.join(', '));
-      send({ ok: true, files });
+      send({ ok: true, files, dir });
+    } else if (msg.type === 'hash') {
+      send({ ok: true, ...(await hashFile(msg.file)) });
+    } else if (msg.type === 'upload') {
+      await uploadFile(msg);
+      log('uploaded', msg.file);
+      send({ ok: true });
     } else {
       send({ ok: false, error: `Unknown message type: ${msg.type}` });
     }
@@ -117,22 +126,55 @@ async function processDemo({ file, targetDir, outputName, dateSuffix, deleteArch
   if (lower.endsWith('.rar')) {
     results = await extractRar(file, dest, dateSuffix);
   } else if (lower.endsWith('.dem.zst') || lower.endsWith('.dem.gz')) {
-    const name = outputName || path.basename(file).replace(/\.(zst|gz)$/i, '');
-    const target = uniquePath(path.join(dest, name));
+    const wanted = path.join(dest, outputName || path.basename(file).replace(/\.(zst|gz)$/i, ''));
+    const target = uniquePath(wanted);
     const decompress = lower.endsWith('.zst') ? zlib.createZstdDecompress() : zlib.createGunzip();
     await pipeline(fs.createReadStream(file), decompress, fs.createWriteStream(target));
-    results = [path.basename(target)];
+    results = [path.basename(await dropIfDuplicate(target, wanted))];
   } else if (lower.endsWith('.dem')) {
-    const target = uniquePath(path.join(dest, outputName || path.basename(file)));
+    const wanted = path.join(dest, outputName || path.basename(file));
+    const target = uniquePath(wanted);
     await moveFile(file, target);
-    return [path.basename(target)]; // already moved, nothing left to delete
+    const kept = await dropIfDuplicate(target, wanted);
+    return { files: [path.basename(kept)], dir: dest }; // already moved, nothing left to delete
   } else {
     throw new Error(`Not a demo file: ${path.basename(file)}`);
   }
 
   if (results.length === 0) throw new Error('The archive did not contain any .dem files.');
   if (deleteArchive) fs.promises.unlink(file).catch(e => log('could not delete archive', e.message));
-  return results;
+  return { files: results, dir: dest };
+}
+
+// ---------- Refrag import ----------
+// The extension talks to Refrag's API; the helper only does the parts that need
+// the file itself, since demos are hundreds of MB and live outside Downloads.
+
+function demoFileOnly(file) {
+  if (!file || !file.toLowerCase().endsWith('.dem') || !fs.existsSync(file)) {
+    throw new Error(`Demo file not found: ${file}`);
+  }
+}
+
+async function hashFile(file) {
+  demoFileOnly(file);
+  const hash = crypto.createHash('sha256');
+  await pipeline(fs.createReadStream(file), hash);
+  return { sha256: hash.digest('hex'), size: fs.statSync(file).size };
+}
+
+async function uploadFile({ file, url, headers }) {
+  demoFileOnly(file);
+  // The upload link comes from Refrag's API (a signed storage URL).
+  if (new URL(url).protocol !== 'https:') throw new Error('Refrag gave a non-secure upload link');
+  const size = fs.statSync(file).size;
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: { ...headers, 'Content-Length': String(size) },
+    body: fs.createReadStream(file),
+    duplex: 'half'
+  });
+  if (!res.ok) throw new Error(`Refrag upload failed (HTTP ${res.status})`);
 }
 
 async function extractRar(file, dest, dateSuffix) {
@@ -149,9 +191,10 @@ async function extractRar(file, dest, dateSuffix) {
       const event = hltvEventName(file, inner);
       let name = event ? `${event}-${inner}` : inner;
       if (dateSuffix) name = name.replace(/\.dem$/i, `-${dateSuffix}.dem`);
-      const target = uniquePath(path.join(dest, name));
+      const wanted = path.join(dest, name);
+      const target = uniquePath(wanted);
       await moveFile(src, target);
-      names.push(path.basename(target));
+      names.push(path.basename(await dropIfDuplicate(target, wanted)));
     }
     return names;
   } finally {
@@ -183,6 +226,19 @@ async function moveFile(src, target) {
       throw err;
     }
   }
+}
+
+// uniquePath avoids overwriting a different demo that has the same name. If the
+// demo we just wrote is byte-for-byte the one already there (the same match
+// downloaded twice), drop the new copy and keep using the existing file.
+async function dropIfDuplicate(written, wanted) {
+  if (written === wanted || !fs.existsSync(wanted)) return written;
+  if (fs.statSync(written).size !== fs.statSync(wanted).size) return written;
+  const [a, b] = await Promise.all([hashFile(written), hashFile(wanted)]);
+  if (a.sha256 !== b.sha256) return written;
+  await fs.promises.unlink(written);
+  log('same demo already there, kept', path.basename(wanted));
+  return wanted;
 }
 
 function uniquePath(p) {

@@ -9,7 +9,9 @@
     "https://www.hltv.org/*",
     "https://*.hltv.org/*",
     "https://www.faceit.com/*",
-    "https://*.faceit-cdn.net/*"
+    "https://*.faceit-cdn.net/*",
+    "https://play.refrag.gg/*",
+    "https://api-k8s.refrag.gg/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -24,6 +26,10 @@
       "matches": ["https://www.faceit.com/*"],
       "js": ["content-faceit.js"],
       "css": ["content.css"]
+    },
+    {
+      "matches": ["https://play.refrag.gg/*"],
+      "js": ["content-refrag.js"]
     }
   ],
   "options_page": "options.html",

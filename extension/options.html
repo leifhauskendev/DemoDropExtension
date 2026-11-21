@@ -15,6 +15,11 @@
     #status { margin-top: 24px; padding: 10px 12px; border-radius: 6px; background: #f1f5f9; }
     #status.ok { background: #dcfce7; }
     #status.bad { background: #fee2e2; }
+    h2 { font-size: 17px; margin: 32px 0 4px; padding-top: 20px; border-top: 1px solid #e2e8f0; }
+    select { width: 100%; padding: 8px; font: inherit; }
+    .refrag { margin-top: 12px; padding: 10px 12px; border-radius: 6px; background: #f1f5f9; }
+    .refrag.ok { background: #dcfce7; }
+    .row button { margin-top: 10px; }
   </style>
 </head>
 <body>
@@ -30,6 +35,23 @@
   <label class="check"><input type="checkbox" id="deleteArchive"> Delete the downloaded archive after unpacking</label>
   <label class="check"><input type="checkbox" id="catchSiteDownloads"> Also handle demos downloaded with HLTV's / FACEIT's own buttons</label>
   <div class="hint">Needed for FACEIT, where the site's "Watch demo" button is the only way to get the file.</div>
+
+  <h2>Refrag</h2>
+  <p class="hint">Import FACEIT demos into Refrag's 2D demo viewer. Needs a Refrag plan with the demo viewer (Prime or Team).</p>
+
+  <div id="refragStatus" class="refrag">Checking Refrag…</div>
+  <div class="row">
+    <button id="refragSignIn" hidden>Sign in to Refrag</button>
+    <button id="refragSignOut" hidden>Disconnect Refrag</button>
+  </div>
+  <div class="hint">DemoDrop uses your login from the Refrag website: sign in on play.refrag.gg and DemoDrop picks it up. Your password never goes through DemoDrop.</div>
+
+  <label for="refragImport">Import FACEIT demos into Refrag</label>
+  <select id="refragImport">
+    <option value="off">Off</option>
+    <option value="ask">Ask me each time (button in the "demos ready" pop-up)</option>
+    <option value="always">Always, automatically</option>
+  </select>
 
   <button id="save">Save</button> <span id="saved"></span>
 
