@@ -67,7 +67,7 @@ Want to scout a team in [Refrag](https://refrag.gg)'s 2D demo viewer? DemoDrop c
    - **Always, automatically**: every FACEIT demo is uploaded right away.
 3. When the upload is done, click the pop-up to open the match in Refrag.
 
-If your Refrag login has expired, DemoDrop asks you to sign in again and then finishes the import by itself. Demos already on Refrag aren't uploaded twice.
+If your Refrag login has expired, DemoDrop asks you to sign in again and then finishes the import by itself. Importing the same demo again just links to the copy already on Refrag instead of adding it a second time.
 
 Note: FACEIT matchmaking demos don't contain team names, so Refrag shows the teams as **team1** and **team2** (team1 is FACEIT's first-listed team). Refrag doesn't allow renaming uploaded demos, so DemoDrop can't change that.
 

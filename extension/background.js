@@ -280,6 +280,14 @@ async function importToRefrag(items) {
       const hash = await sendToHost({ type: 'hash', file });
       if (!hash.ok) throw new Error(hash.error);
 
+      // Refrag creates a new demo entry on every POST, even for a file it
+      // already has, so don't ask it again for demos we imported before.
+      const known = await findImported(session, hash.sha256);
+      if (known) {
+        await notifyRefragLink('Already on Refrag', `${name}\nClick to open it in Refrag.`, known.link);
+        continue;
+      }
+
       const form = new FormData();
       form.append('demo[game]', 'cs2');
       form.append('demo[file_hash]', hash.sha256);
@@ -298,11 +306,9 @@ async function importToRefrag(items) {
 
       const analysis = demo.status === 'ready' ? {} : await refragFetch(session, `demos/${demo.id}/analyze`, { method: 'POST' });
       const link = analysis.match_id ? `${REFRAG_APP}matches/${analysis.match_id}` : `${REFRAG_APP}demos/${demo.id}`;
-      const id = await notify(demo.status === 'ready' ? 'Already on Refrag' : 'Imported to Refrag',
-        `${name}\nClick to open it in Refrag${demo.status === 'ready' ? '' : ' (processing can take a few minutes)'}.`);
-      const { refragLinks = {} } = await chrome.storage.session.get('refragLinks');
-      refragLinks[id] = link;
-      await chrome.storage.session.set({ refragLinks });
+      await rememberImported(session, hash.sha256, { demoId: demo.id, link });
+      await notifyRefragLink(demo.status === 'ready' ? 'Already on Refrag' : 'Imported to Refrag',
+        `${name}\nClick to open it in Refrag${demo.status === 'ready' ? '' : ' (processing can take a few minutes)'}.`, link);
     } catch (err) {
       if (err.signIn) {
         await deferImport(items.slice(i));
@@ -314,6 +320,40 @@ async function importToRefrag(items) {
       setBadge('');
     }
   }
+}
+
+// Demos DemoDrop has imported, by Refrag team and file SHA-256.
+async function rememberImported(session, sha256, entry) {
+  const { refragImported = {} } = await chrome.storage.local.get('refragImported');
+  refragImported[`${session.teamId}:${sha256}`] = entry;
+  await chrome.storage.local.set({ refragImported });
+}
+
+async function findImported(session, sha256) {
+  const key = `${session.teamId}:${sha256}`;
+  const { refragImported = {} } = await chrome.storage.local.get('refragImported');
+  const entry = refragImported[key];
+  if (!entry) return null;
+  // Still there? (It may have been deleted on Refrag since.)
+  const res = await fetch(`${REFRAG_API}demos/${entry.demoId}.json`, { headers: refragHeaders(session) });
+  if (res.ok) return entry;
+  if (res.status === 404) {
+    delete refragImported[key];
+    await chrome.storage.local.set({ refragImported });
+    return null;
+  }
+  if (res.status === 401) {
+    await chrome.storage.local.remove('refragSession');
+    throw Object.assign(new Error('Your Refrag login has expired.'), { signIn: true });
+  }
+  return entry; // other errors: assume it's still there rather than duplicate it
+}
+
+async function notifyRefragLink(title, message, link) {
+  const id = await notify(title, message);
+  const { refragLinks = {} } = await chrome.storage.session.get('refragLinks');
+  refragLinks[id] = link;
+  await chrome.storage.session.set({ refragLinks });
 }
 
 async function offerRefragSignIn(message) {
